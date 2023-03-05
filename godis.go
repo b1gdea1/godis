@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/godis/obj"
+	"github.com/godis/tools"
 	"hash/fnv"
 	"log"
 	"os"
@@ -26,8 +28,8 @@ const (
 )
 
 type GodisDB struct {
-	data   *Dict
-	expire *Dict
+	data   *obj.Dict
+	expire *obj.Dict
 }
 
 type GodisServer struct {
@@ -35,14 +37,14 @@ type GodisServer struct {
 	port    int
 	db      *GodisDB
 	clients map[int]*GodisClient
-	aeLoop  *AeLoop
+	aeLoop  *tools.AeLoop
 }
 
 type GodisClient struct {
 	fd       int
 	db       *GodisDB
-	args     []*Gobj
-	reply    *List
+	args     []*obj.Gobj
+	reply    *obj.List
 	sentLen  int
 	queryBuf []byte
 	queryLen int
@@ -53,7 +55,7 @@ type GodisClient struct {
 
 type CommandProc func(c *GodisClient)
 
-// do not support bulk command
+// GodisCommand do not support bulk command
 type GodisCommand struct {
 	name  string
 	proc  CommandProc
@@ -62,27 +64,27 @@ type GodisCommand struct {
 
 // Global Varibles
 var server GodisServer
-var cmdTable []GodisCommand = []GodisCommand{
+var cmdTable = []GodisCommand{
 	{"get", getCommand, 2},
 	{"set", setCommand, 3},
 	{"expire", expireCommand, 3},
 	//TODO
 }
 
-func expireIfNeeded(key *Gobj) {
+func expireIfNeeded(key *obj.Gobj) {
 	entry := server.db.expire.Find(key)
 	if entry == nil {
 		return
 	}
 	when := entry.Val.IntVal()
-	if when > GetMsTime() {
+	if when > tools.GetMsTime() {
 		return
 	}
 	server.db.expire.Delete(key)
 	server.db.data.Delete(key)
 }
 
-func findKeyRead(key *Gobj) *Gobj {
+func findKeyRead(key *obj.Gobj) *obj.Gobj {
 	expireIfNeeded(key)
 	return server.db.data.Get(key)
 }
@@ -93,7 +95,7 @@ func getCommand(c *GodisClient) {
 	if val == nil {
 		//TODO: extract shared.strings
 		c.AddReplyStr("$-1\r\n")
-	} else if val.Type_ != GSTR {
+	} else if val.Type_ != obj.GSTR {
 		//TODO: extract shared.strings
 		c.AddReplyStr("-ERR: wrong type\r\n")
 	} else {
@@ -105,7 +107,7 @@ func getCommand(c *GodisClient) {
 func setCommand(c *GodisClient) {
 	key := c.args[1]
 	val := c.args[2]
-	if val.Type_ != GSTR {
+	if val.Type_ != obj.GSTR {
 		//TODO: extract shared.strings
 		c.AddReplyStr("-ERR: wrong type\r\n")
 	}
@@ -117,12 +119,12 @@ func setCommand(c *GodisClient) {
 func expireCommand(c *GodisClient) {
 	key := c.args[1]
 	val := c.args[2]
-	if val.Type_ != GSTR {
+	if val.Type_ != obj.GSTR {
 		//TODO: extract shared.strings
 		c.AddReplyStr("-ERR: wrong type\r\n")
 	}
-	expire := GetMsTime() + (val.IntVal() * 1000)
-	expObj := CreateFromInt(expire)
+	expire := tools.GetMsTime() + (val.IntVal() * 1000)
+	expObj := obj.CreateFromInt(expire)
 	server.db.expire.Set(key, expObj)
 	expObj.DecrRefCount()
 	c.AddReplyStr("+OK\r\n")
@@ -137,14 +139,14 @@ func lookupCommand(cmdStr string) *GodisCommand {
 	return nil
 }
 
-func (c *GodisClient) AddReply(o *Gobj) {
+func (c *GodisClient) AddReply(o *obj.Gobj) {
 	c.reply.Append(o)
 	o.IncrRefCount()
-	server.aeLoop.AddFileEvent(c.fd, AE_WRITABLE, SendReplyToClient, c)
+	server.aeLoop.AddFileEvent(c.fd, tools.AE_WRITABLE, SendReplyToClient, c)
 }
 
 func (c *GodisClient) AddReplyStr(str string) {
-	o := CreateObject(GSTR, str)
+	o := obj.CreateObject(obj.GSTR, str)
 	c.AddReply(o)
 	o.DecrRefCount()
 }
@@ -177,8 +179,8 @@ func freeArgs(client *GodisClient) {
 }
 
 func freeReplyList(client *GodisClient) {
-	for client.reply.length != 0 {
-		n := client.reply.head
+	for client.reply.GetLen() != 0 {
+		n := client.reply.GetHead()
 		client.reply.DelNode(n)
 		n.Val.DecrRefCount()
 	}
@@ -187,10 +189,10 @@ func freeReplyList(client *GodisClient) {
 func freeClient(client *GodisClient) {
 	freeArgs(client)
 	delete(server.clients, client.fd)
-	server.aeLoop.RemoveFileEvent(client.fd, AE_READABLE)
-	server.aeLoop.RemoveFileEvent(client.fd, AE_WRITABLE)
+	server.aeLoop.RemoveFileEvent(client.fd, tools.AE_READABLE)
+	server.aeLoop.RemoveFileEvent(client.fd, tools.AE_WRITABLE)
 	freeReplyList(client)
-	Close(client.fd)
+	tools.Close(client.fd)
 }
 
 func resetClient(client *GodisClient) {
@@ -224,9 +226,9 @@ func handleInlineBuf(client *GodisClient) (bool, error) {
 	subs := strings.Split(string(client.queryBuf[:index]), " ")
 	client.queryBuf = client.queryBuf[index+2:]
 	client.queryLen -= index + 2
-	client.args = make([]*Gobj, len(subs))
+	client.args = make([]*obj.Gobj, len(subs))
 	for i, v := range subs {
-		client.args[i] = CreateObject(GSTR, v)
+		client.args[i] = obj.CreateObject(obj.GSTR, v)
 	}
 
 	return true, nil
@@ -248,7 +250,7 @@ func handleBulkBuf(client *GodisClient) (bool, error) {
 			return true, nil
 		}
 		client.bulkNum = bnum
-		client.args = make([]*Gobj, bnum)
+		client.args = make([]*obj.Gobj, bnum)
 	}
 	// read every bulk string
 	for client.bulkNum > 0 {
@@ -280,7 +282,7 @@ func handleBulkBuf(client *GodisClient) (bool, error) {
 		if client.queryBuf[index] != '\r' || client.queryBuf[index+1] != '\n' {
 			return false, errors.New("expect CRLF for bulk end")
 		}
-		client.args[len(client.args)-client.bulkNum] = CreateObject(GSTR, string(client.queryBuf[:index]))
+		client.args[len(client.args)-client.bulkNum] = obj.CreateObject(obj.GSTR, string(client.queryBuf[:index]))
 		client.queryBuf = client.queryBuf[index+2:]
 		client.queryLen -= index + 2
 		client.bulkLen = 0
@@ -327,12 +329,12 @@ func ProcessQueryBuf(client *GodisClient) error {
 	return nil
 }
 
-func ReadQueryFromClient(loop *AeLoop, fd int, extra interface{}) {
+func ReadQueryFromClient(loop *tools.AeLoop, fd int, extra interface{}) {
 	client := extra.(*GodisClient)
 	if len(client.queryBuf)-client.queryLen < GODIS_MAX_BULK {
 		client.queryBuf = append(client.queryBuf, make([]byte, GODIS_MAX_BULK)...)
 	}
-	n, err := Read(fd, client.queryBuf[client.queryLen:])
+	n, err := tools.Read(fd, client.queryBuf[client.queryLen:])
 	if err != nil {
 		log.Printf("client %v read err: %v\n", fd, err)
 		freeClient(client)
@@ -349,7 +351,7 @@ func ReadQueryFromClient(loop *AeLoop, fd int, extra interface{}) {
 	}
 }
 
-func SendReplyToClient(loop *AeLoop, fd int, extra interface{}) {
+func SendReplyToClient(loop *tools.AeLoop, fd int, extra interface{}) {
 	client := extra.(*GodisClient)
 	log.Printf("SendReplyToClient, reply len:%v\n", client.reply.Length())
 	for client.reply.Length() > 0 {
@@ -357,7 +359,7 @@ func SendReplyToClient(loop *AeLoop, fd int, extra interface{}) {
 		buf := []byte(rep.Val.StrVal())
 		bufLen := len(buf)
 		if client.sentLen < bufLen {
-			n, err := Write(fd, buf[client.sentLen:])
+			n, err := tools.Write(fd, buf[client.sentLen:])
 			if err != nil {
 				log.Printf("send reply err: %v\n", err)
 				freeClient(client)
@@ -376,19 +378,19 @@ func SendReplyToClient(loop *AeLoop, fd int, extra interface{}) {
 	}
 	if client.reply.Length() == 0 {
 		client.sentLen = 0
-		loop.RemoveFileEvent(fd, AE_WRITABLE)
+		loop.RemoveFileEvent(fd, tools.AE_WRITABLE)
 	}
 }
 
-func GStrEqual(a, b *Gobj) bool {
-	if a.Type_ != GSTR || b.Type_ != GSTR {
+func GStrEqual(a, b *obj.Gobj) bool {
+	if a.Type_ != obj.GSTR || b.Type_ != obj.GSTR {
 		return false
 	}
 	return a.StrVal() == b.StrVal()
 }
 
-func GStrHash(key *Gobj) int64 {
-	if key.Type_ != GSTR {
+func GStrHash(key *obj.Gobj) int64 {
+	if key.Type_ != obj.GSTR {
 		return 0
 	}
 	hash := fnv.New64()
@@ -401,12 +403,12 @@ func CreateClient(fd int) *GodisClient {
 	client.fd = fd
 	client.db = server.db
 	client.queryBuf = make([]byte, GODIS_IO_BUF)
-	client.reply = ListCreate(ListType{EqualFunc: GStrEqual})
+	client.reply = obj.ListCreate(obj.ListType{EqualFunc: GStrEqual})
 	return &client
 }
 
-func AcceptHandler(loop *AeLoop, fd int, extra interface{}) {
-	cfd, err := Accept(fd)
+func AcceptHandler(loop *tools.AeLoop, fd int, extra interface{}) {
+	cfd, err := tools.Accept(fd)
 	if err != nil {
 		log.Printf("accept err: %v\n", err)
 		return
@@ -414,14 +416,14 @@ func AcceptHandler(loop *AeLoop, fd int, extra interface{}) {
 	client := CreateClient(cfd)
 	//TODO: check max clients limit
 	server.clients[cfd] = client
-	server.aeLoop.AddFileEvent(cfd, AE_READABLE, ReadQueryFromClient, client)
+	server.aeLoop.AddFileEvent(cfd, tools.AE_READABLE, ReadQueryFromClient, client)
 	log.Printf("accept client, fd: %v\n", cfd)
 }
 
 const EXPIRE_CHECK_COUNT int = 100
 
 // background job, runs every 100ms
-func ServerCron(loop *AeLoop, id int, extra interface{}) {
+func ServerCron(loop *tools.AeLoop, id int, extra interface{}) {
 	for i := 0; i < EXPIRE_CHECK_COUNT; i++ {
 		entry := server.db.expire.RandomGet()
 		if entry == nil {
@@ -438,14 +440,14 @@ func initServer(config *Config) error {
 	server.port = config.Port
 	server.clients = make(map[int]*GodisClient)
 	server.db = &GodisDB{
-		data:   DictCreate(DictType{HashFunc: GStrHash, EqualFunc: GStrEqual}),
-		expire: DictCreate(DictType{HashFunc: GStrHash, EqualFunc: GStrEqual}),
+		data:   obj.DictCreate(obj.DictType{HashFunc: GStrHash, EqualFunc: GStrEqual}),
+		expire: obj.DictCreate(obj.DictType{HashFunc: GStrHash, EqualFunc: GStrEqual}),
 	}
 	var err error
-	if server.aeLoop, err = AeLoopCreate(); err != nil {
+	if server.aeLoop, err = tools.AeLoopCreate(); err != nil {
 		return err
 	}
-	server.fd, err = TcpServer(server.port)
+	server.fd, err = tools.TcpServer(server.port)
 	return err
 }
 
@@ -459,8 +461,8 @@ func main() {
 	if err != nil {
 		log.Printf("init server error: %v\n", err)
 	}
-	server.aeLoop.AddFileEvent(server.fd, AE_READABLE, AcceptHandler, nil)
-	server.aeLoop.AddTimeEvent(AE_NORMAL, 100, ServerCron, nil)
+	server.aeLoop.AddFileEvent(server.fd, tools.AE_READABLE, AcceptHandler, nil)
+	server.aeLoop.AddTimeEvent(tools.AE_NORMAL, 100, ServerCron, nil)
 	log.Println("godis server is up.")
 	server.aeLoop.AeMain()
 }

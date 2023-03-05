@@ -1,4 +1,4 @@
-package main
+package obj
 
 type Node struct {
 	Val  *Gobj
@@ -17,6 +17,12 @@ type List struct {
 	length int
 }
 
+func (list *List) GetLen() int {
+	return list.length
+}
+func (list *List) GetHead() *Node {
+	return list.head
+}
 func ListCreate(listType ListType) *List {
 	var list List
 	list.ListType = listType

@@ -1,4 +1,4 @@
-package main
+package tools
 
 import (
 	"fmt"
@@ -35,7 +35,7 @@ func EchoServer(s, c, e chan struct{}) {
 	e <- struct{}{}
 }
 
-//func TestNet(t *testing.T) {
+// func TestNet(t *testing.T) {
 func useTestAeInstead(t *testing.T) {
 	fmt.Println("test net lib, rerun the test if the program is blocked")
 	s := make(chan struct{})

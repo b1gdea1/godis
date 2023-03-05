@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/godis/obj"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -77,7 +78,7 @@ func TestProcessQueryBuf(t *testing.T) {
 	err := ProcessQueryBuf(client)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(client.args))
-	key := CreateObject(GSTR, "key")
+	key := obj.CreateObject(obj.GSTR, "key")
 	val := server.db.data.Get(key)
 	assert.Equal(t, "val", val.StrVal())
 
