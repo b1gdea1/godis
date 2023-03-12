@@ -2,14 +2,13 @@ package obj
 
 import (
 	"fmt"
-	"github.com/godis"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDict(t *testing.T) {
-	dict := DictCreate(DictType{HashFunc: main.GStrHash, EqualFunc: main.GStrEqual})
+	dict := DictCreate(DictType{HashFunc: GStrHash, EqualFunc: GStrEqual})
 	entry := dict.RandomGet()
 	assert.Nil(t, entry)
 
@@ -44,7 +43,7 @@ func TestDict(t *testing.T) {
 }
 
 func TestRehash(t *testing.T) {
-	dict := DictCreate(DictType{HashFunc: main.GStrHash, EqualFunc: main.GStrEqual})
+	dict := DictCreate(DictType{HashFunc: GStrHash, EqualFunc: GStrEqual})
 	entry := dict.RandomGet()
 	assert.Nil(t, entry)
 

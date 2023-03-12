@@ -1,14 +1,13 @@
 package obj
 
 import (
-	"github.com/godis"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestList(t *testing.T) {
-	list := ListCreate(ListType{EqualFunc: main.GStrEqual})
+	list := ListCreate(ListType{EqualFunc: GStrEqual})
 	assert.Equal(t, list.Length(), 0)
 
 	list.Append(CreateObject(GSTR, "4"))
