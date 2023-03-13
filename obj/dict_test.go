@@ -47,7 +47,7 @@ func TestRehash(t *testing.T) {
 	entry := dict.RandomGet()
 	assert.Nil(t, entry)
 
-	valve := int(INIT_SIZE * (FORCE_RATIO + 1))
+	valve := int(InitSize * (ForceRatio + 1))
 	for i := 0; i < valve; i++ {
 		key := CreateObject(GSTR, fmt.Sprintf("k%v", i))
 		val := CreateObject(GSTR, fmt.Sprintf("v%v", i))
@@ -62,14 +62,14 @@ func TestRehash(t *testing.T) {
 	assert.Nil(t, e)
 	assert.Equal(t, true, dict.isRehashing())
 	assert.Equal(t, int64(0), dict.rehashidx)
-	assert.Equal(t, int64(INIT_SIZE), dict.hts[0].size)
-	assert.Equal(t, int64(INIT_SIZE*GROW_RATIO), dict.hts[1].size)
+	assert.Equal(t, int64(InitSize), dict.hts[0].size)
+	assert.Equal(t, int64(InitSize*GrowRatio), dict.hts[1].size)
 
-	for i := 0; i <= int(INIT_SIZE); i++ {
+	for i := 0; i <= int(InitSize); i++ {
 		dict.RandomGet()
 	}
 	assert.Equal(t, false, dict.isRehashing())
-	assert.Equal(t, int64(INIT_SIZE*GROW_RATIO), dict.hts[0].size)
+	assert.Equal(t, int64(InitSize*GrowRatio), dict.hts[0].size)
 	assert.Nil(t, dict.hts[1])
 	for i := 0; i <= valve; i++ {
 		key := CreateObject(GSTR, fmt.Sprintf("k%v", i))

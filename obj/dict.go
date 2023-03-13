@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	INIT_SIZE    int64 = 8
-	FORCE_RATIO  int64 = 2
-	GROW_RATIO   int64 = 2
-	DEFAULT_STEP int   = 1
+	InitSize    int64 = 8
+	ForceRatio  int64 = 2
+	GrowRatio   int64 = 2
+	DefaultStep int   = 1
 )
 
 var (
@@ -57,7 +57,7 @@ func (dict *Dict) isRehashing() bool {
 
 func (dict *Dict) rehashStep() {
 	//TODO: check iterators
-	dict.rehash(DEFAULT_STEP)
+	dict.rehash(DefaultStep)
 }
 
 func (dict *Dict) rehash(step int) {
@@ -68,7 +68,7 @@ func (dict *Dict) rehash(step int) {
 			dict.rehashidx = -1
 			return
 		}
-		// find an nonull slot
+		// find a non-null slot
 		for dict.hts[0].table[dict.rehashidx] == nil {
 			dict.rehashidx += 1
 		}
@@ -90,7 +90,7 @@ func (dict *Dict) rehash(step int) {
 }
 
 func nextPower(size int64) int64 {
-	for i := INIT_SIZE; i < math.MaxInt64; i *= 2 {
+	for i := InitSize; i < math.MaxInt64; i *= 2 {
 		if i >= size {
 			return i
 		}
@@ -124,10 +124,10 @@ func (dict *Dict) expandIfNeeded() error {
 		return nil
 	}
 	if dict.hts[0] == nil {
-		return dict.expand(INIT_SIZE)
+		return dict.expand(InitSize)
 	}
-	if (dict.hts[0].used > dict.hts[0].size) && (dict.hts[0].used/dict.hts[0].size > FORCE_RATIO) {
-		return dict.expand(dict.hts[0].size * GROW_RATIO)
+	if (dict.hts[0].used > dict.hts[0].size) && (dict.hts[0].used/dict.hts[0].size > ForceRatio) {
+		return dict.expand(dict.hts[0].size * GrowRatio)
 	}
 	return nil
 }
@@ -180,7 +180,7 @@ func (dict *Dict) AddRaw(key *Gobj) *Entry {
 	return &e
 }
 
-// add a new key-val pair, return err if key exists
+// Add a new key-val pair, return err if key exists
 func (dict *Dict) Add(key, val *Gobj) error {
 	entry := dict.AddRaw(key)
 	if entry == nil {
@@ -236,7 +236,7 @@ func (dict *Dict) Delete(key *Gobj) error {
 			break
 		}
 	}
-	// key doesnt exist
+	// key does not exist
 	return NK_ERR
 }
 

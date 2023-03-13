@@ -182,10 +182,11 @@ func (loop *AeLoop) AeWait() (tes []*AeTimeEvent, fes []*AeFileEvent) {
 		timeout = 10 // at least wait 10ms
 	}
 	var events [128]unix.EpollEvent
-	n, err := unix.EpollWait(loop.fileEventFd, events[:], int(timeout))
-	if err != nil {
-		log.Printf("epoll wait warnning: %v\n", err)
-	}
+	n, _ := unix.EpollWait(loop.fileEventFd, events[:], int(timeout))
+	// block warning that is way too annoying
+	//if err != nil {
+	//	log.Printf("epoll wait warnning: %v\n", err)
+	//}
 	if n > 0 {
 		log.Printf("ae get %v epoll events\n", n)
 	}

@@ -21,11 +21,6 @@ type GodisDB struct {
 	Expire *Dict
 }
 
-type command struct {
-	name  string
-	arity int
-}
-
 const (
 	CommandUnknown CmdType = 0x00
 	CommandInline  CmdType = 0x01
@@ -33,18 +28,17 @@ const (
 )
 
 type GodisClient struct {
-	fd           int
-	db           *GodisDB
-	args         []*Gobj
-	reply        *List
-	sentLen      int
-	QueryBuf     []byte
-	QueryLen     int
-	cmdTy        CmdType
-	bulkNum      int
-	bulkLen      int
-	server       *GodisServer
-	commandsLens map[string]int
+	fd       int
+	db       *GodisDB
+	args     []*Gobj
+	reply    *List
+	sentLen  int
+	QueryBuf []byte
+	QueryLen int
+	cmdTy    CmdType
+	bulkNum  int
+	bulkLen  int
+	server   *GodisServer
 }
 
 func (client *GodisClient) get() {
@@ -76,6 +70,17 @@ func (client *GodisClient) ProcessCommand() {
 	log.Printf("process command: %v\n", cmdStr)
 	if cmdStr == "quit" {
 		client.freeClient()
+		return
+	}
+	if cmdStr == "command" {
+		var ret []byte
+		l := len(commandTable)
+		sLen := fmt.Sprintf("*%d\r\n", l)
+		ret = append(ret, []byte(sLen)...)
+		for _, command := range commandTable {
+			ret = append(ret, []byte(fmt.Sprintf("$%d%v\r\n", len(command.name), command.name))...)
+		}
+		client.AddReplyStr(string(ret))
 		return
 	}
 	client.processCmd()
@@ -292,12 +297,6 @@ func SendReplyToClient(loop *tools.AeLoop, fd int, extra interface{}) {
 	}
 }
 
-var commandTable = []command{
-	{"get", 2},
-	{"set", 3},
-	{"expire", 3},
-}
-
 func CreateClient(fd int, server *GodisServer) *GodisClient {
 	var client GodisClient
 	client.fd = fd
@@ -305,10 +304,5 @@ func CreateClient(fd int, server *GodisServer) *GodisClient {
 	client.db = server.Db
 	client.QueryBuf = make([]byte, GodisIoBuf)
 	client.reply = ListCreate(ListType{EqualFunc: GStrEqual})
-	client.commandsLens = make(map[string]int)
-	l := len(commandTable)
-	for i := 0; i < l; i++ {
-		client.commandsLens[commandTable[i].name] = commandTable[i].arity
-	}
 	return &client
 }
