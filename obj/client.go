@@ -47,21 +47,6 @@ type GodisClient struct {
 	commandsLens map[string]int
 }
 
-func (client *GodisClient) processCmd() {
-	args := client.args
-	arity := client.commandsLens[args[0].StrVal()]
-	fmt.Printf("length of %s is %d\r\n", args[0].StrVal(), arity)
-	if arity <= 0 {
-		client.AddReplyStr("-ERR: wrong number of args")
-		client.resetClient()
-		return
-	}
-	if arity != len(args) {
-		client.AddReplyStr("-ERR: unknown command")
-		client.resetClient()
-		return
-	}
-}
 func (client *GodisClient) get() {
 	key := client.args[1]
 	val := client.server.findKeyRead(key)
@@ -85,22 +70,15 @@ func (client *GodisClient) AddReplyStr(str string) {
 
 func (client *GodisClient) ProcessCommand() {
 	cmdStr := client.args[0].StrVal()
+	if len(cmdStr) == 0 {
+		return
+	}
 	log.Printf("process command: %v\n", cmdStr)
 	if cmdStr == "quit" {
 		client.freeClient()
 		return
 	}
-	//cmd := lookupCommand(cmdStr)
-	//if cmd == nil {
-	//	client.AddReplyStr("-ERR: unknown command")
-	//	resetClient(client)
-	//	return
-	//} else if cmd.arity != len(client.args) {
-	//	client.AddReplyStr("-ERR: wrong number of args")
-	//	resetClient(client)
-	//	return
-	//}
-	//cmd.proc(client)
+	client.processCmd()
 	client.resetClient()
 }
 
