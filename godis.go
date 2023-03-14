@@ -8,62 +8,6 @@ import (
 	"time"
 )
 
-//
-//
-//
-//
-//
-//
-//
-//func getCommand(c *obj.GodisClient) {
-//	key := c.args[1]
-//	val := findKeyRead(key)
-//	if val == nil {
-//		//TODO: extract shared.strings
-//		c.AddReplyStr("$-1\r\n")
-//	} else if val.Type_ != obj.GSTR {
-//		//TODO: extract shared.strings
-//		c.AddReplyStr("-ERR: wrong type\r\n")
-//	} else {
-//		str := val.StrVal()
-//		c.AddReplyStr(fmt.Sprintf("$%d%v\r\n", len(str), str))
-//	}
-//}
-//
-//func setCommand(c *obj.GodisClient) {
-//	key := c.args[1]
-//	val := c.args[2]
-//	if val.Type_ != obj.GSTR {
-//		//TODO: extract shared.strings
-//		c.AddReplyStr("-ERR: wrong type\r\n")
-//	}
-//	server.db.data.Set(key, val)
-//	server.db.expire.Delete(key)
-//	c.AddReplyStr("+OK\r\n")
-//}
-//
-//func expireCommand(c *obj.GodisClient) {
-//	key := c.args[1]
-//	val := c.args[2]
-//	if val.Type_ != obj.GSTR {
-//		//TODO: extract shared.strings
-//		c.AddReplyStr("-ERR: wrong type\r\n")
-//	}
-//	expire := tools.GetMsTime() + (val.IntVal() * 1000)
-//	expObj := obj.CreateFromInt(expire)
-//	server.db.expire.Set(key, expObj)
-//	expObj.DecrRefCount()
-//	c.AddReplyStr("+OK\r\n")
-//}
-
-//	func lookupCommand(cmdStr string) *GodisCommand {
-//		for _, c := range cmdTable {
-//			if c.name == cmdStr {
-//				return &c
-//			}
-//		}
-//		return nil
-//	}
 var server obj.GodisServer
 
 func AcceptHandler(loop *tools.AeLoop, fd int, extra interface{}) {
@@ -108,7 +52,7 @@ func initServer(config *Config) (err error) {
 		Data:   obj.DictCreate(obj.DictType{HashFunc: obj.GStrHash, EqualFunc: obj.GStrEqual}),
 		Expire: obj.DictCreate(obj.DictType{HashFunc: obj.GStrHash, EqualFunc: obj.GStrEqual}),
 	}
-	server = obj.CreateGodisServer(serverFd, config.Port, db, make(map[int]*obj.GodisClient), aeLoop)
+	server = obj.CreateGodisServer(serverFd, config.Port, db, make(map[int]*obj.GodisClient), aeLoop, config.Pass)
 	return err
 }
 

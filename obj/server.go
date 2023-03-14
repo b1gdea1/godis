@@ -8,15 +8,17 @@ type GodisServer struct {
 	Db      *GodisDB
 	clients map[int]*GodisClient
 	aeLoop  *tools.AeLoop
+	Pass    string
 }
 
-func CreateGodisServer(fd int, port int, db *GodisDB, clients map[int]*GodisClient, aeLoop *tools.AeLoop) GodisServer {
+func CreateGodisServer(fd int, port int, db *GodisDB, clients map[int]*GodisClient, aeLoop *tools.AeLoop, pass string) GodisServer {
 	return GodisServer{
 		FD:      fd,
 		port:    port,
 		Db:      db,
 		clients: clients,
 		aeLoop:  aeLoop,
+		Pass:    pass,
 	}
 }
 

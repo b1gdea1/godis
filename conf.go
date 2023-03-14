@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	Port int `json:"port"`
+	Port int    `json:"port"`
+	Pass string `json:"pass"`
 }
 
 func LoadConfig(path string) (config *Config, err error) {

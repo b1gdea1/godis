@@ -28,17 +28,19 @@ const (
 )
 
 type GodisClient struct {
-	fd       int
-	db       *GodisDB
-	args     []*Gobj
-	reply    *List
-	sentLen  int
-	QueryBuf []byte
-	QueryLen int
-	cmdTy    CmdType
-	bulkNum  int
-	bulkLen  int
-	server   *GodisServer
+	fd           int
+	db           *GodisDB
+	args         []*Gobj
+	reply        *List
+	sentLen      int
+	QueryBuf     []byte
+	QueryLen     int
+	cmdTy        CmdType
+	bulkNum      int
+	bulkLen      int
+	server       *GodisServer
+	authed       bool
+	commandNames []string
 }
 
 func (client *GodisClient) get() {
@@ -68,22 +70,28 @@ func (client *GodisClient) ProcessCommand() {
 		return
 	}
 	log.Printf("process command: %v\n", cmdStr)
-	if cmdStr == "quit" {
-		client.freeClient()
+	//if cmdStr == "auth" {
+	//	if client.args[1].StrVal() == client.server.Pass {
+	//		client.authed = true
+	//	}
+	//}
+
+	if !client.authed {
+		client.processUnauthedCommand()
 		return
 	}
-	if cmdStr == "command" {
-		var ret []byte
-		l := len(commandTable)
-		sLen := fmt.Sprintf("*%d\r\n", l)
-		ret = append(ret, []byte(sLen)...)
-		for _, command := range commandTable {
-			ret = append(ret, []byte(fmt.Sprintf("$%d%v\r\n", len(command.name), command.name))...)
-		}
-		client.AddReplyStr(string(ret))
-		return
-	}
-	client.processCmd()
+	//if cmdStr == "command" {
+	//	var ret []byte
+	//	l := len(authedCommandTable)
+	//	sLen := fmt.Sprintf("*%d\r\n", l)
+	//	ret = append(ret, []byte(sLen)...)
+	//	for _, command := range authedCommandTable {
+	//		ret = append(ret, []byte(fmt.Sprintf("$%d%v\r\n", len(command.name), command.name))...)
+	//	}
+	//	client.AddReplyStr(string(ret))
+	//	return
+	//}
+	client.processAuthedCmd()
 	client.resetClient()
 }
 
@@ -304,5 +312,13 @@ func CreateClient(fd int, server *GodisServer) *GodisClient {
 	client.db = server.Db
 	client.QueryBuf = make([]byte, GodisIoBuf)
 	client.reply = ListCreate(ListType{EqualFunc: GStrEqual})
+	client.authed = false
+	client.commandNames = make([]string, 0)
+	for _, c := range authedCommandTable {
+		client.commandNames = append(client.commandNames, c.name)
+	}
+	for _, c := range unauthedCommandTable {
+		client.commandNames = append(client.commandNames, c.name)
+	}
 	return &client
 }

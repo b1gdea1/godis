@@ -12,28 +12,35 @@ type command struct {
 	proc  GodisCommand
 }
 
-var commandTable = []command{
+var authedCommandTable = []command{
 	{"get", 2, getCommand},
 	{"set", 3, setCommand},
 	{"expire", 3, expireCommand},
 }
 
-func (client *GodisClient) processCmd() {
-	c := client.findCommand()
+func (client *GodisClient) processAuthedCmd() {
+	c := client.findCommand(&unauthedCommandTable)
+	if c != nil {
+		(*c)(client)
+		return
+	}
+	c = client.findCommand(&authedCommandTable)
 	if c == nil {
-		client.AddReplyStr("-ERR: unknown command\r\n")
-		client.resetClient()
+		if client.cmdTy != CommandUnknown {
+			client.AddReplyStr("-ERR: unknown command\r\n")
+			client.resetClient()
+		}
 		return
 	}
 	(*c)(client)
 }
 
-func (client *GodisClient) findCommand() *GodisCommand {
-	for _, c := range commandTable {
+func (client *GodisClient) findCommand(table *[]command) *GodisCommand {
+	for _, c := range *table {
 		if c.name == client.args[0].StrVal() {
 			if c.arity != len(client.args) {
-				//client.AddReplyStr("-ERR: wrong number of args\r\n")
-				//client.resetClient()
+				client.AddReplyStr("-ERR: wrong length of args\r\n")
+				client.resetClient()
 				return nil
 			}
 			return &c.proc
@@ -81,4 +88,49 @@ func expireCommand(client *GodisClient) {
 	}
 	client.server.Db.Expire.Set(key, CreateFromInt(tools.GetMsTime()+val.IntVal()*1000))
 	client.AddReplyStr("+OK\r\n")
+}
+
+var unauthedCommandTable = []command{
+	{"quit", 1, quitCommand},
+	{"command", 1, commandCommand},
+	{"auth", 2, authCommand},
+}
+
+func authCommand(client *GodisClient) {
+	if client.args[1].StrVal() == client.server.Pass {
+		client.authed = true
+		client.AddReplyStr("+OK\r\n")
+		client.resetClient()
+	} else {
+		client.authed = false
+		client.AddReplyStr("-ERR: wrong password\r\n")
+		client.resetClient()
+	}
+}
+
+func commandCommand(client *GodisClient) {
+	var ret []byte
+	l := len(client.commandNames)
+	sLen := fmt.Sprintf("*%d\r\n", l)
+	ret = append(ret, []byte(sLen)...)
+	for _, name := range client.commandNames {
+		ret = append(ret, []byte(fmt.Sprintf("$%d%v\r\n", len(name), name))...)
+	}
+	client.AddReplyStr(string(ret))
+	return
+}
+
+func quitCommand(client *GodisClient) {
+	client.freeClient()
+	return
+}
+
+func (client *GodisClient) processUnauthedCommand() {
+	c := client.findCommand(&unauthedCommandTable)
+	if c == nil {
+		client.AddReplyStr("-ERR: not an unauthed command\r\n")
+		client.resetClient()
+		return
+	}
+	(*c)(client)
 }
